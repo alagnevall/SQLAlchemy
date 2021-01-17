@@ -37,10 +37,11 @@ def Home():
     """List all available api routes."""
     return (
         f"Available Routes:<br/>"
-        f"/api/v1.0/precipitation<br/>"
-        f"/api/v1.0/stations<br>"
-        f"/api/v1.0/tobs<br/>"
-        f"/api/v1.0/<start>"
+        f"<a href=\"/api/v1.0/precipitation\">/api/v1.0/precipitation</a><br/>"
+        f"<a href=\"/api/v1.0/stations\">/api/v1.0/stations</a><br>"
+        f"<a href=\"/api/v1.0/tobs\">/api/v1.0/tobs</a><br/>"
+        f"<a href=\"/api/v1.0/start\">/api/v1.0/start</a><br>"
+        f"<a href=\"/api/v1.0/start/end\">/api/v1.0/start/end</a>"
 
     )
 
@@ -107,16 +108,34 @@ def Tobs():
 
     return jsonify(temp_list)
 
-# @app.route("/api/v1.0/<start>")
-# def names():
-#     # Create our session (link) from Python to the DB
-#     session = Session(engine)
+@app.route("/api/v1.0/<start>/<end>")
+def StartEnd(start, end):
+    # Create our session (link) from Python to the DB
+    session = Session(engine)
 
-#     """Return a list of all passenger names"""
-#     # Query all passengers
-#     results = session.query(Passenger.name).all()
+    
+    """Return a JSON list of the minimum temperature, the average temperature, and the max temperature for a given start or start-end range."""
+    # Query with start and end date
+    result = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).\
+            filter(Measurement.date >= start).filter(Measurement.date <= end).all()
+    session.close()
 
-#     session.close()
+    return jsonify(result)
+
+@app.route("/api/v1.0/<start>")
+def Start(start):
+    # Create our session (link) from Python to the DB
+    session = Session(engine)
+
+    """Return a JSON list of the minimum temperature, the average temperature, and the max temperature for a given start or start-end range."""
+    # Query with start date only
+    result = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).\
+            filter(Measurement.date >= start).all()
+    
+    session.close()
+
+    return jsonify(result)    
+    
 
 #     # Convert list of tuples into normal list
 #     all_names = list(np.ravel(results))
