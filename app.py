@@ -1,5 +1,3 @@
-import numpy as np
-
 import sqlalchemy
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
@@ -35,13 +33,14 @@ app = Flask(__name__)
 @app.route("/")
 def Home():
     """List all available api routes."""
+   #create route with hyperlink as a little bonus
     return (
         f"Available Routes:<br/>"
-        f"<a href=\"/api/v1.0/precipitation\">/api/v1.0/precipitation</a><br/>"
-        f"<a href=\"/api/v1.0/stations\">/api/v1.0/stations</a><br>"
-        f"<a href=\"/api/v1.0/tobs\">/api/v1.0/tobs</a><br/>"
-        f"<a href=\"/api/v1.0/start\">/api/v1.0/start</a><br>"
-        f"<a href=\"/api/v1.0/start/end\">/api/v1.0/start/end</a>"
+        f"<a href=\"/api/v1.0/precipitation\">/api/v1.0/precipitation</a> - Returning: precipitation by day for last year of data<br/>"
+        f"<a href=\"/api/v1.0/stations\">/api/v1.0/stations</a> - Returning: names of all stations<br/>"
+        f"<a href=\"/api/v1.0/tobs\">/api/v1.0/tobs</a> - Returning: temps for last year of data for most active station<br/>"
+        f"<a href=\"/api/v1.0/start\">/api/v1.0/yyyy-mm-dd</a> - Returning: Tmin, Tavg, Tmax<br/>"
+        f"<a href=\"/api/v1.0/start/end\">/api/v1.0/yyyy-mm-dd/yyyy-mm-dd</a> - Returning: Tmin, Tavg, Tmax"
 
     )
 
@@ -53,8 +52,8 @@ def Precipitation():
 
     """Convert the query results to a dictionary using date as the key and prcp as the value."""
     # Query last year data
-    # lastyear = session.query(Measurement.date).order_by(Measurement.date.desc()).first()
-    yearquery = dt.date(2017,8,23) - dt.timedelta(days = 365)
+    lastyear = session.query(Measurement.date).order_by(Measurement.date.desc()).first()
+    yearquery = dt.datetime.strptime(lastyear[0], '%Y-%m-%d') - dt.timedelta(days = 365)
     results = session.query(Measurement.date, Measurement.prcp ).\
         filter(Measurement.date >= yearquery).all()
 
@@ -74,13 +73,13 @@ def Stations():
     session = Session(engine)
 
     """Return a JSON list of stations from the dataset."""
-    results =  session.query(Station)
+    results =  session.query(Station).all()
     session.close()
 
-    # Create a dictionary from the row data and append to a list of all_passengers
+    # Create a list of station names using the name column
     station_list = []
     for row in results:
-       station_list.append(row.station)
+       station_list.append(row.name)
 
     return jsonify(station_list)
 
@@ -91,7 +90,8 @@ def Tobs():
 
     """Query the dates and temperature observations of the most active station for the last year of data."""
     #query prior year
-    yearquery = dt.date(2017,8,23) - dt.timedelta(days = 365)
+    lastyear = session.query(Measurement.date).order_by(Measurement.date.desc()).first()
+    yearquery = dt.datetime.strptime(lastyear[0], '%Y-%m-%d') - dt.timedelta(days = 365)
     # Query most active station
     most_active = session.query(Measurement.station).group_by(Measurement.station).\
         order_by(func.count(Measurement.date).desc()).first()
@@ -101,7 +101,7 @@ def Tobs():
 
     session.close()
 
-#     # JSON list of temps observed for prior year
+    # JSON list of temps observed for prior year
     temp_list = []
     for row in high_station:
        temp_list.append(row.tobs)
@@ -110,6 +110,7 @@ def Tobs():
 
 @app.route("/api/v1.0/<start>/<end>")
 def StartEnd(start, end):
+
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
@@ -118,16 +119,17 @@ def StartEnd(start, end):
     # Query with start and end date
     result = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).\
             filter(Measurement.date >= start).filter(Measurement.date <= end).all()
+
     session.close()
 
     return jsonify(result)
 
 @app.route("/api/v1.0/<start>")
 def Start(start):
+
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    """Return a JSON list of the minimum temperature, the average temperature, and the max temperature for a given start or start-end range."""
     # Query with start date only
     result = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).\
             filter(Measurement.date >= start).all()
@@ -135,12 +137,6 @@ def Start(start):
     session.close()
 
     return jsonify(result)    
-    
-
-#     # Convert list of tuples into normal list
-#     all_names = list(np.ravel(results))
-
-#     return jsonify(all_names)
 
 if __name__ == '__main__':
     app.run(debug=True)
